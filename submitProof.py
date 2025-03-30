@@ -197,7 +197,7 @@ def send_signed_msg(proof, random_leaf):
     signed_tx = w3.eth.account.sign_transaction(transaction, acct.key)
     
     # Send the transaction and get the transaction hash
-    tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+    tx_hash = w3.eth.send_raw_transaction(signed_tx.raw_transaction)
     
     # Wait for transaction receipt to ensure it was mined
     w3.eth.wait_for_transaction_receipt(tx_hash)
