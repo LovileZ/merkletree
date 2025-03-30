@@ -46,9 +46,18 @@ def generate_primes(num_primes):
         returns list (with length n) of primes (as ints) in ascending order
     """
     primes_list = []
-
-    #TODO YOUR CODE HERE
-
+    candidate = 2  # Start with the first prime number
+    while len(primes_list) < num_primes:
+        is_prime = True
+        for p in primes_list:
+            if p * p > candidate:
+                break
+            if candidate % p == 0:
+                is_prime = False
+                break
+        if is_prime:
+            primes_list.append(candidate)
+        candidate += 1
     return primes_list
 
 
@@ -57,10 +66,7 @@ def convert_leaves(primes_list):
         Converts the leaves (primes_list) to bytes32 format
         returns list of primes where list entries are bytes32 encodings of primes_list entries
     """
-
-    # TODO YOUR CODE HERE
-
-    return []
+    return [int.to_bytes(prime, length=32, byteorder='big') for prime in primes_list]
 
 
 def build_merkle(leaves):
@@ -70,9 +76,18 @@ def build_merkle(leaves):
         tree[1] is the parent hashes, and so on until tree[n] which is the root hash
         the root hash produced by the "hash_pair" helper function
     """
+    tree = [leaves]
+    current_level = leaves
 
-    #TODO YOUR CODE HERE
-    tree = []
+    while len(current_level) > 1:
+        next_level = []
+        for i in range(0, len(current_level), 2):
+            if i + 1 < len(current_level):
+                next_level.append(hash_pair(current_level[i], current_level[i + 1]))
+            else:
+                next_level.append(current_level[i])  # Handle odd number of nodes
+        tree.append(next_level)
+        current_level = next_level
 
     return tree
 
@@ -85,7 +100,15 @@ def prove_merkle(merkle_tree, random_indx):
         returns a proof of inclusion as list of values
     """
     merkle_proof = []
-    # TODO YOUR CODE HERE
+    current_index = random_indx
+
+    for level in merkle_tree[:-1]:  # Exclude the root level
+        if current_index % 2 == 0:  # Left node
+            if current_index + 1 < len(level):
+                merkle_proof.append(level[current_index + 1])
+        else:  # Right node
+            merkle_proof.append(level[current_index - 1])
+        current_index //= 2
 
     return merkle_proof
 
@@ -103,8 +126,8 @@ def sign_challenge(challenge):
     addr = acct.address
     eth_sk = acct.key
 
-    # TODO YOUR CODE HERE
-    eth_sig_obj = 'placeholder'
+    eth_encoded_msg = eth_account.messages.encode_defunct(text=challenge)
+    eth_sig_obj = acct.sign_message(eth_encoded_msg)
 
     return addr, eth_sig_obj.signature.hex()
 
@@ -121,10 +144,20 @@ def send_signed_msg(proof, random_leaf):
     address, abi = get_contract_info(chain)
     w3 = connect_to(chain)
 
-    # TODO YOUR CODE HERE
-    tx_hash = 'placeholder'
+    contract = w3.eth.contract(address=address, abi=abi)
+    nonce = w3.eth.get_transaction_count(acct.address)
 
-    return tx_hash
+    tx = contract.functions.claimPrime(random_leaf, proof).build_transaction({
+        'from': acct.address,
+        'nonce': nonce,
+        'gas': 2000000,
+        'gasPrice': w3.to_wei('5', 'gwei')
+    })
+
+    signed_tx = w3.eth.account.sign_transaction(tx, acct.key)
+    tx_hash = w3.eth.send_raw_transaction(signed_tx.rawTransaction)
+
+    return tx_hash.hex()
 
 
 # Helper functions that do not need to be modified
